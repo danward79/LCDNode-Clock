@@ -5,7 +5,8 @@ Since I coded the origincal LCDNode, I moved country. In my new home I can't mon
 
 -------
 
-Features
+**Features**
+
 1.  Large clock display, with flashing colon to indicate seconds.
 2.  Outside temperature with min/max of the day.
 3.  Inside temperature (local).
@@ -14,9 +15,11 @@ Features
 6.  Receives time updates from base station via RFM12B.
 7.  Broadcasts local light and temp readings.
 
-TODO:
+**TODO:**
+
 1.  Need to decide what to use the 2 x bicolour LEDs for yet.
 2.  Would like to add capability to listed for sunset / sunrise packets to control (optionally?) the backlight.
 
-Credits
+**Credits**
+
 1.  Makes use of Jeelabs RFM12 and GLCD libraries.
