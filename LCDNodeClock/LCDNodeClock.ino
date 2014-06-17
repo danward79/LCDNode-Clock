@@ -38,6 +38,10 @@ GLCD_ST7565 glcd;
 #include <Wire.h>                 
 RTC_Millis RTC;
 
+#include <Bounce2.h>
+Bounce enter = Bounce(); 
+Bounce up = Bounce(); 
+Bounce down = Bounce(); 
 //------------------------------------------------------------------------------
 // RFM12B Settings
 //------------------------------------------------------------------------------
@@ -47,7 +51,7 @@ RTC_Millis RTC;
 
 #define ONE_WIRE_BUS 5  
 
-unsigned long fast_update, slow_update, backLightOverrideTime;
+unsigned long fast_update, slow_update, backLightOverrideTime, buttonPressTime;
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -102,6 +106,13 @@ void setup()
   pinMode(greenLED, OUTPUT); 
   pinMode(redLED, OUTPUT); 
   
+  enter.attach(switchEnter);
+  enter.interval(5);
+  up.attach(switchUp);
+  up.interval(5);
+  down.attach(switchDown);
+  down.interval(5);
+  
   RTC.begin(DateTime(__DATE__, __TIME__));
   
   Serial.begin(57600);
@@ -113,7 +124,54 @@ void setup()
 //------------------------------------------------------------------------------
 void loop()
 {
+  //Button control & page control
+  boolean enterStateChanged = enter.update();
+  boolean upStateChanged = up.update();
+  boolean downStateChanged = down.update();
   
+  if (enterStateChanged){ //Detect enter button long or short press.
+    if (enter.read())
+    {
+      buttonPressTime = millis();
+    } else {
+      if (millis() - buttonPressTime > 1500){
+        Serial.print(">1.5s ");
+        backLightOverride = !backLightOverride;
+        Serial.println(backLightOverride);
+      }
+      else{
+        page += 1;
+        if (page > 1) page = 0;
+      }
+    }
+  }
+  
+  
+  
+  // Up and Down Button backlight override
+  bool switch_state = up.read() or down.read();  
+  
+  if (switch_state) // Backlight override
+  {
+    backLightOverride = true;
+    backLightOverrideTime = millis();
+  }
+  
+  
+  
+
+
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  // RF Reception
   if (rf12_recvDone())
   {
     if (rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0)  // and no rf errors
@@ -144,8 +202,7 @@ void loop()
 //------------------------------------------------------------------------------
 // Display update every 200ms
 //------------------------------------------------------------------------------
-  if ((millis()-fast_update)>200)
-  {
+  if ((millis()-fast_update)>200){
     fast_update = millis();
     
     DateTime now = RTC.now();
@@ -159,40 +216,24 @@ void loop()
   
     // Backlight time control
     if ((hour >= backLightOffHour) ||  (hour < backLightOnHour)) {
+      Serial.print("bckliteoverride ");   Serial.println(backLightOverride);
+ 
       if (!backLightOverride) {
         glcd.backLight(0); 
       } else {
         glcd.backLight(LDRbacklight);
       }
-      
+    
       if ((millis() - backLightOverrideTime) > 6000) {
         glcd.backLight(0);
         backLightOverride = false;
       }
-      
+    
     } else {
-      
+    
       glcd.backLight(LDRbacklight);
-      
-    }
     
-    //Page Control
-    bool switch_state = digitalRead(switchEnter);  
-    
-    if (switch_state)
-    {
-      page += 1;
-      if (page > 1) page = 0;
-    }
-    
-    // Button and page control
-    switch_state = digitalRead(switchUp) or digitalRead(switchDown);  
-    
-    if (switch_state) // Backlight override
-    {
-      backLightOverride = true;
-      backLightOverrideTime = millis();
-    }
+    } 
     
     if (page == 0) //Standard Power Page
     {
@@ -206,7 +247,10 @@ void loop()
       draw_weather_page((outdoornode.light * 100/255), outdoornode.humidity, outdoornode.temperature, dp, calculateCloudbase (outdoornode.temperature, dp), barotx.pressure);
       glcd.refresh();
     }
-    
+    else if (page == 2){ // Settings page
+ 
+    } 
+      
   } 
   
   //Slow page updates

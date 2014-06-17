@@ -9,9 +9,6 @@
 void draw_main_page(int hourval, int minval, int sec)
 { 
   glcd.clear();
-  glcd.fillRect(0,0,128,64,0);
-  
-
 
   char str[8], str2[2];
   
@@ -40,9 +37,9 @@ void draw_temperature_time_footer(int temp, int mintemp, int maxtemp, double loc
 {
   
   glcd.setFont(font_clR6x8);      
-  glcd.drawString(0,42,"  OUTSIDE     INSIDE");
-  glcd.drawLine(77, 39, 77, 65, WHITE);
-  glcd.drawLine(0, 39, 128, 39, WHITE);     //middle horizontal line 
+  glcd.drawString(12, 42, "OUTSIDE     INSIDE");
+  glcd.drawLine(77, 40, 77, 65, WHITE);
+  glcd.drawLine(0, 40, 128, 40, WHITE);     //middle horizontal line 
 
   char str[8], str2[2];
   // GLCD Temperature
@@ -80,36 +77,48 @@ void draw_weather_page(int light, int humidity, int temperature, int dewpoint, i
   glcd.clear();
   glcd.setFont(font_clR6x8);
   glcd.drawString(40, 0, "WEATHER");
+  glcd.drawLine(0, 8, 128, 8, WHITE);
   
   glcd.setFont(font_clR4x6);           
 
-  glcd.drawString_P(2,9,PSTR("Temperature: "));
-  glcd.drawString_P(2,16,PSTR("Humidity: "));
-  glcd.drawString_P(2,23,PSTR("Light: "));
-  glcd.drawString_P(2,30,PSTR("Pressure: "));
-  glcd.drawString_P(2,37,PSTR("Cloudbase: "));
-  glcd.drawString_P(2,44,PSTR("Dewpoint: "));
+  glcd.drawString_P(2,10,PSTR("Temperature: "));
+  glcd.drawString_P(2,17,PSTR("Humidity: "));
+  glcd.drawString_P(2,24,PSTR("Light: "));
+  glcd.drawString_P(2,31,PSTR("Pressure: "));
+  glcd.drawString_P(2,38,PSTR("Cloudbase: "));
+  glcd.drawString_P(2,45,PSTR("Dewpoint: "));
   
   char str[21];
  
   sprintf(str, "%d.%d C", temperature/10, temperature%10);
-  glcd.drawString(55, 9, str);
+  glcd.drawString(55, 10, str);
   
   sprintf(str, "%d", humidity/10);
   strcat(str, " %");
-  glcd.drawString(55, 16, str);
+  glcd.drawString(55, 17, str);
 
   sprintf(str, "%d", light);
   strcat(str, " %");
-  glcd.drawString(55, 23, str);
+  glcd.drawString(55, 24, str);
   
   sprintf(str, "%d hPa", pressure/100);
-  glcd.drawString(55, 30, str);
+  glcd.drawString(55, 31, str);
   
   sprintf(str, "%d ft", cloudbase);
-  glcd.drawString(55, 37, str);
+  glcd.drawString(55, 38, str);
   
   sprintf(str, "%d C", dewpoint);
-  glcd.drawString(55, 44, str);
+  glcd.drawString(55, 45, str);
 
+}
+
+void draw_settings_page()
+{ 
+  glcd.clear();
+  glcd.setFont(font_clR6x8);      
+  glcd.drawString(40, 0, "SETTINGS");
+  glcd.drawLine(0, 8, 128, 8, WHITE);
+  
+  glcd.drawString(2, 10, "Backlight: ");
+      
 }
