@@ -58,7 +58,7 @@ unsigned long fast_update, slow_update, backLightOverrideTime, buttonPressTime;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
-int temperature, maxtemp, mintemp, page;
+int maxtemp, mintemp, page;
 int hour = 12, minute = 0;
 boolean backLightOverride = false;
 boolean firstTempReading = false;
@@ -184,6 +184,9 @@ void loop()
     hour = now.hour();
     minute = now.minute();
     
+    //reset min/max temp at midnight
+    if (last_hour == 23 && hour == 00) maxtemp = mintemp = outdoornode.temperature;
+    
     int LDR = analogRead(LDRpin); // Read the LDR Value
     int LDRbacklight = map(LDR, 0, 1023, 1, 255); // Map the LDR from 0-1023 to 0-255 
     
@@ -221,7 +224,7 @@ void loop()
     
     if (page == 0){ //Standard Power Page
       draw_main_page(hour, minute, now.second());
-      draw_temperature_time_footer(temperature, mintemp, maxtemp, sensors.getTempCByIndex(0));
+      draw_temperature_time_footer(outdoornode.temperature, mintemp, maxtemp, sensors.getTempCByIndex(0));
       glcd.refresh();
     }
     else if (page == 1){ //Weather Page
@@ -238,13 +241,11 @@ void loop()
   {
     slow_update = millis();
     
-    //Update Min/Max Temp
-    temperature = outdoornode.temperature;
-    
-    if ((temperature > -500) && (temperature < 700))
+    //Update Min/Max Temp    
+    if ((outdoornode.temperature > -500) && (outdoornode.temperature < 700))
     {
-      if (temperature > maxtemp) maxtemp = temperature;
-      if (temperature < mintemp) mintemp = temperature;
+      if (outdoornode.temperature > maxtemp) maxtemp = outdoornode.temperature;
+      if (outdoornode.temperature < mintemp) mintemp = outdoornode.temperature;
     }
   
     // Get local temp
