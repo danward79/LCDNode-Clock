@@ -111,14 +111,3 @@ void draw_weather_page(int light, int humidity, int temperature, int dewpoint, i
   glcd.drawString(55, 45, str);
 
 }
-
-void draw_settings_page()
-{ 
-  glcd.clear();
-  glcd.setFont(font_clR6x8);      
-  glcd.drawString(40, 0, "SETTINGS");
-  glcd.drawLine(0, 8, 128, 8, WHITE);
-  
-  glcd.drawString(2, 10, "Backlight: ");
-      
-}

@@ -1,12 +1,14 @@
 /*
 //------------------------------------------------------------------------------
-// emonGLCD Based LCD Node
+// GLCD Based LCD Clock Node
 // Based on original code from Open Energy Monitor and Libraries from Jeelabs
 
 // Desired functionality
-// - LEDs
 // - Clock Page
 // - Weather Page
+// - Ability to override timed backlight, reset at next on or off time
+// - LEDs TODO
+// - ?
 
 // RTC is implemented is software. 
 // Correct time is updated via RF Packet which gets time from internet
@@ -56,12 +58,11 @@ unsigned long fast_update, slow_update, backLightOverrideTime, buttonPressTime;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
-double localTemp;
-int temp, maxtemp, mintemp;
+int temperature, maxtemp, mintemp, page;
 int hour = 12, minute = 0;
 boolean backLightOverride = false;
-int page;
 boolean firstTempReading = false;
+boolean forceBacklight = false;
 
 //---------------------------------------------------
 // Data structures for transfering data between units
@@ -84,8 +85,8 @@ PayloadGLCD emonglcd;
 #define switchEnter 15
 #define switchUp 16
 #define switchDown 19
-#define backLightOffHour 22
-#define backLightOnHour 07
+#define backLightOffHour 23
+#define backLightOnHour 05
 
 
 //------------------------------------------------------------------------------
@@ -93,27 +94,22 @@ PayloadGLCD emonglcd;
 //------------------------------------------------------------------------------
 void setup()
 {
-  //delay(300); 				   //wait for power to settle before firing up the RF
   rf12_initialize(MYNODE, freq, group);
-  delay(400);				   //wait for RF to settle befor turning on display
+  delay(100);
   
   glcd.begin(0x19);
-  glcd.backLight(200);
   
-  sensors.begin();                // start up the DS18B20 temp sensor onboard  
-  sensors.requestTemperatures();
+  sensors.begin();               
   
   pinMode(greenLED, OUTPUT); 
   pinMode(redLED, OUTPUT); 
   
-  enter.attach(switchEnter);
-  enter.interval(5);
-  up.attach(switchUp);
-  up.interval(5);
-  down.attach(switchDown);
-  down.interval(5);
+  enter.attach(switchEnter); enter.interval(5);
+  up.attach(switchUp); up.interval(5);
+  down.attach(switchDown); down.interval(5);
   
-  RTC.begin(DateTime(__DATE__, __TIME__));
+  //RTC.begin(DateTime(__DATE__, __TIME__));
+  RTC.begin(DateTime(2014, 6, 20, 00, 00, 00));
   
   Serial.begin(57600);
   Serial.println("\nLCD Node");
@@ -130,56 +126,34 @@ void loop()
   boolean downStateChanged = down.update();
   
   if (enterStateChanged){ //Detect enter button long or short press.
-    if (enter.read())
-    {
+    if (enter.read()){
       buttonPressTime = millis();
     } else {
       if (millis() - buttonPressTime > 1500){
-        Serial.print(">1.5s ");
-        backLightOverride = !backLightOverride;
-        Serial.println(backLightOverride);
+        forceBacklight = !forceBacklight;
       }
-      else{
+      else {
         page += 1;
         if (page > 1) page = 0;
       }
     }
-  }
-  
-  
+  }    
   
   // Up and Down Button backlight override
-  bool switch_state = up.read() or down.read();  
+  boolean switch_state = up.read() or down.read();  
   
-  if (switch_state) // Backlight override
-  {
+  // Backlight override
+  if (switch_state){
     backLightOverride = true;
     backLightOverrideTime = millis();
   }
   
-  
-  
-
-
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
   // RF Reception
-  if (rf12_recvDone())
-  {
-    if (rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0)  // and no rf errors
-    {
+  if (rf12_recvDone()){
+    if (rf12_crc == 0 && (rf12_hdr & RF12_HDR_CTL) == 0){ // and no rf errors
       int node_id = (rf12_hdr & 0x1F);
       
-      if (node_id == 16)
-      {
+      if (node_id == 16){
         outdoornode = *(PayloadOutdoor*) rf12_data;
         if (!firstTempReading){
           mintemp = maxtemp = outdoornode.temperature; 
@@ -187,14 +161,14 @@ void loop()
         };
       }
       
-      if (node_id == 17)
-      {
+      if (node_id == 17){
         barotx = *(PayloadBaro*) rf12_data;
       }
-      
-      if (node_id == 31)			//Time transmission
-      {
-        RTC.adjust(DateTime(2014, 1, 1, rf12_data[1], rf12_data[2], rf12_data[3]));
+
+      if (node_id == 31){		//Time transmission
+        if (rf12_data[0] == 116){
+          RTC.adjust(DateTime(2014, 1, 1, rf12_data[1], rf12_data[2], rf12_data[3]));
+        }
       } 
     }
   }
@@ -211,45 +185,51 @@ void loop()
     minute = now.minute();
     
     int LDR = analogRead(LDRpin); // Read the LDR Value
-    int LDRbacklight = map(LDR, 0, 1023, 50, 250); // Map the LDR from 0-1023 (Max seen 1000) to var GLCDbrightness min/max
-    LDRbacklight = constrain(LDRbacklight, 0, 255); // Constrain PWM value 0-255
-  
-    // Backlight time control
-    if ((hour >= backLightOffHour) ||  (hour < backLightOnHour)) {
-      Serial.print("bckliteoverride ");   Serial.println(backLightOverride);
- 
-      if (!backLightOverride) {
-        glcd.backLight(0); 
-      } else {
-        glcd.backLight(LDRbacklight);
-      }
+    int LDRbacklight = map(LDR, 0, 1023, 1, 255); // Map the LDR from 0-1023 to 0-255 
     
-      if ((millis() - backLightOverrideTime) > 6000) {
-        glcd.backLight(0);
-        backLightOverride = false;
+    //reset backlight forcing, on the next entry or exit to time boundary
+    if (forceBacklight){
+      if ((last_hour == (backLightOffHour - 1)) && (hour == backLightOffHour)) forceBacklight = !forceBacklight;
+      if ((last_hour == (backLightOnHour - 1)) && (hour == backLightOnHour)) forceBacklight = !forceBacklight;  
+    }
+    
+    // Backlight time control
+    if ((hour >= backLightOffHour) ||  (hour < backLightOnHour)){
+      
+      if (backLightOverride){
+        glcd.backLight(LDRbacklight);
+        
+        if ((millis() - backLightOverrideTime) > 6000){
+          glcd.backLight(0);
+          backLightOverride = false;
+        }
+      } else {
+        if(forceBacklight){
+          glcd.backLight(LDRbacklight);
+        } else {
+          glcd.backLight(0); 
+        }
       }
     
     } else {
-    
-      glcd.backLight(LDRbacklight);
-    
+      if (forceBacklight){
+        glcd.backLight(0);
+      } else {
+        glcd.backLight(LDRbacklight);
+      }
     } 
     
-    if (page == 0) //Standard Power Page
-    {
+    if (page == 0){ //Standard Power Page
       draw_main_page(hour, minute, now.second());
-      draw_temperature_time_footer(temp, mintemp, maxtemp, localTemp);
+      draw_temperature_time_footer(temperature, mintemp, maxtemp, sensors.getTempCByIndex(0));
       glcd.refresh();
     }
-    else if (page == 1) //Weather Page
-    {
+    else if (page == 1){ //Weather Page
       int dp = calculateDewpoint(outdoornode.humidity, outdoornode.temperature);
+      
       draw_weather_page((outdoornode.light * 100/255), outdoornode.humidity, outdoornode.temperature, dp, calculateCloudbase (outdoornode.temperature, dp), barotx.pressure);
       glcd.refresh();
     }
-    else if (page == 2){ // Settings page
- 
-    } 
       
   } 
   
@@ -259,27 +239,27 @@ void loop()
     slow_update = millis();
     
     //Update Min/Max Temp
-    temp = outdoornode.temperature;
+    temperature = outdoornode.temperature;
     
-    if ((temp > -500) && (temp < 700))
+    if ((temperature > -500) && (temperature < 700))
     {
-      if (temp > maxtemp) maxtemp = temp;
-      if (temp < mintemp) mintemp = temp;
+      if (temperature > maxtemp) maxtemp = temperature;
+      if (temperature < mintemp) mintemp = temperature;
     }
-    
+  
     // Get local temp
     sensors.requestTemperatures();
-    localTemp = (sensors.getTempCByIndex(0));
-   
+
     // set emonglcd payload
-     emonglcd.temperature = (int) (localTemp * 100); 
-     emonglcd.light = 255 - analogRead(LDRpin) / 4;
-                     
+    emonglcd.temperature = (int) (sensors.getTempCByIndex(0) * 100); 
+    emonglcd.light = 255 - analogRead(LDRpin) / 4;
+              
     // Broadcast temp and light reading
-     rf12_sendNow(0, &emonglcd, sizeof emonglcd);
-     rf12_sendWait(2);    
+    rf12_sendNow(0, &emonglcd, sizeof emonglcd);
+    rf12_sendWait(2);  
   }
 }
+
 
 //cloudBase calculation
 int calculateCloudbase (int t, int d)
