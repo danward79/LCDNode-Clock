@@ -188,7 +188,7 @@ void loop()
     if (last_hour == 23 && hour == 00) maxtemp = mintemp = outdoornode.temperature;
     
     int LDR = analogRead(LDRpin); // Read the LDR Value
-    int LDRbacklight = map(LDR, 0, 1023, 1, 255); // Map the LDR from 0-1023 to 0-255 
+    int LDRbacklight = map(LDR, 0, 1023, 2, 255); // Map the LDR from 0-1023 to 0-255 
     
     //reset backlight forcing, on the next entry or exit to time boundary
     if (forceBacklight){
